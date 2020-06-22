@@ -225,18 +225,21 @@ const drawMovementArrow = () => {
 
 const drawArrow = (fromx, fromy, tox, toy) => {
     console.log("drawing arrow");
+    let RADIUS_MULTIPLIER = 1.25
     let headlen = 10;
     let xDiff = tox - fromx;
     let yDiff = toy - fromy;
     let angle = Math.atan2(yDiff, xDiff);
 
-    let x2 = tox - (TROOP_RADIUS * 1.4) * Math.cos(angle);
-    let y2 = toy - (TROOP_RADIUS * 1.4) * Math.sin(angle);
+    let x1 = fromx + (TROOP_RADIUS * RADIUS_MULTIPLIER) * Math.cos(angle);
+    let y1 = fromy + (TROOP_RADIUS * RADIUS_MULTIPLIER) * Math.sin(angle);
+    let x2 = tox - (TROOP_RADIUS * RADIUS_MULTIPLIER) * Math.cos(angle);
+    let y2 = toy - (TROOP_RADIUS * RADIUS_MULTIPLIER) * Math.sin(angle);
 
     mapContext.strokeStyle = 'white';
     mapContext.lineWidth = 2;
     mapContext.beginPath();
-    mapContext.moveTo(fromx, fromy);
+    mapContext.moveTo(x1, y1);
     mapContext.lineTo(x2, y2);
     mapContext.lineTo(x2 - headlen * Math.cos(angle - Math.PI / 6), y2 - headlen * Math.sin(angle - Math.PI / 6));
     mapContext.lineTo(x2 - headlen * Math.cos(angle + Math.PI / 6), y2 - headlen * Math.sin(angle + Math.PI / 6));
@@ -245,6 +248,22 @@ const drawArrow = (fromx, fromy, tox, toy) => {
     mapContext.fillStyle = 'white';
     mapContext.fill();
     mapContext.stroke();
+}
+
+const attackTroopSelector = document.getElementById("troop-attack-selector")
+const attackPrompt = () => {
+    // Initialize options
+    let len = attackTroopSelector.options.length;
+    for (let i = len - 1; i >= 0; i-- ) {
+        attackTroopSelector.remove(i);
+    }
+    let troops = game.troops_available_for_attack();
+    // attackTroopSelector.options.length = troops;
+    for (const i of Array(troops).keys()) {
+        if (i === 0) continue;
+        attackTroopSelector.options[attackTroopSelector.options.length] = new Option(i.toString(),i.toString());
+    }
+    attackTroopSelector.style.zIndex = 9999;
 }
 
 const updateTroops = () => {
@@ -274,12 +293,15 @@ const updateControls = () => {
         clearPlacementButton.hidden = false;
         applyPlacementButton.hidden = false;
     }
+    if (game.is_attack_phase() && game.attack_target_selected()) {
+        attackPrompt();
+    }
 }
 const renderLoop = () => {
     // mapContext.globalCompositeOperation = 'destination-over';
     drawMap();
-    drawMovementArrow();
     drawTroopContainers();
+    drawMovementArrow();
     updateTroops();
     updateControls();
 };

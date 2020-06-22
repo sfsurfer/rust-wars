@@ -144,9 +144,6 @@ impl Game {
         //       for now just move to attack whenever button is pressed
         self.turn.phase = TurnPhase::Place;
     }
-    pub fn is_place_phase(&self) -> bool {
-        self.turn.phase == TurnPhase::Place
-    }
     pub fn attack_phase(&mut self) -> () {
         // TODO: Needs checks that this is allowed
         //       for now just move to attack whenever button is pressed
@@ -156,6 +153,17 @@ impl Game {
         // TODO: Needs checks that this is allowed
         //       for now just move to fortify whenever button is pressed
         self.turn.phase = TurnPhase::Fortify;
+    }
+    pub fn is_place_phase(&self) -> bool {
+        self.turn.phase == TurnPhase::Place
+    }
+    pub fn is_attack_phase(&self) -> bool {
+        self.turn.phase == TurnPhase::Attack
+    }
+
+    pub fn attack_target_selected(&self) -> bool {
+        self.is_attack_phase() &&
+            self.map.territories.iter().find(|t| t.is_targeted()).is_some()
     }
 
     pub fn on_player_index(&self) -> usize {
@@ -207,7 +215,17 @@ impl Game {
         // 0 as usize
     }
 
+    pub fn troops_available_for_attack(&self) -> usize {
+        if self.turn_phase() == TurnPhase::Attack {
+            let total_troops = self.map.territories.iter().find(|t| t.is_selected()).map(|t| t.troops);
+            // -1 is handled naturally on front end by creating a zero based list
+            *(total_troops.map(|t| t as usize).get_or_insert(0))
+        } else {
+            0 as usize
+        }
+    }
 }
+
 impl Game {
     pub fn on_player(&self) -> &Player {
         &(self.players[self.on_player_index()])

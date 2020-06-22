@@ -33,6 +33,25 @@
       <canvas id="rust-wars-bg" style="position: absolute; left: 0; top: 0; z-index: 0"></canvas>
       <canvas id="rust-wars-map" style="position: absolute; left: 0; top: 0; z-index: 1"></canvas>
       <canvas id="rust-wars-troop-boxes" style="position: absolute; left: 0; top: 0; z-index: 2"></canvas>
+      <div id="attack-modal" style="position: absolute; left: 0; top: 0; z-index: -1; background-color: darkgrey">
+        <div tabindex=1 role="dialog">
+          <div role="document">
+            <div id="attack-modal-content">
+              <div id="attack-modal-header">
+                <h2>Attack</h2>
+              </div>
+              <div id="attack-modal-body" style="flex-direction: row; align-items: center">
+                <select id="troop-attack-selector"></select>
+                <button id="attack-modal-button-all">All</button>
+                <button id="attack-modal-button-tail">Tail</button>
+              </div>
+              <div id="attack-modal-confirm">
+                <button id="attack-modal-button-cancel">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
     <script src="./bootstrap.js"></script>
   </body>
