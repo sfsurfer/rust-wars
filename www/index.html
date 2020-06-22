@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Rust Wars!</title>
+    <style>
+      body {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+    </style>
+  </head>
+  <body>
+    <noscript>This page contains webassembly and javascript content, please enable javascript in your browser.</noscript>
+    <div style="flex-direction: row; align-items: center">
+      <div id="troops-available"></div>
+      <button id="placement-button">Place</button>
+      <text id="troop-placement-counter"></text>
+      <button id="attack-button">Attack</button>
+      <button id="fortify-button">Fortify</button>
+      <button id="clear-placement">Clear</button>
+      <button id="apply-placement">Apply</button>
+      <button id="end-turn-button">End Turn</button>
+    </div>
+    <div style="position: relative">
+      <canvas id="rust-wars-bg" style="position: absolute; left: 0; top: 0; z-index: 0"></canvas>
+      <canvas id="rust-wars-map" style="position: absolute; left: 0; top: 0; z-index: 1"></canvas>
+      <canvas id="rust-wars-troop-boxes" style="position: absolute; left: 0; top: 0; z-index: 2"></canvas>
+    </div>
+    <script src="./bootstrap.js"></script>
+  </body>
+</html>

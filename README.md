@@ -7,5 +7,6 @@ A Risk like game built on Rust and wasm-pack, inspired by the games at wargear.n
 ```js
 wasm-pack build
 cd www/
+npm install
 npm run start
 ```
