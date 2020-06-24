@@ -163,6 +163,13 @@ const drawMapBackground = () => {
         bgContext.stroke();
     }
 };
+const gameStatus = () => {
+    // Simply checks if game is over
+    if (game.is_over()) {
+        let winner = game.active_players()[0];
+        alert(`Game Over. Player ${winner} won!`);
+    }
+}
 
 const drawMap = () => {
     for (let i = 0; i < territoryCount; i++) {
@@ -319,6 +326,7 @@ const updateControls = () => {
 }
 const renderLoop = () => {
     // mapContext.globalCompositeOperation = 'destination-over';
+    gameStatus();
     drawMap();
     drawTroopContainers();
     drawMovementArrow();

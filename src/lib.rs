@@ -36,7 +36,11 @@ impl Player {
     pub fn capture_territory(&mut self, territory_index: u32) -> () {
         self.territories.push(territory_index);
     }
+    pub fn is_elimiated(&self) -> bool {
+        self.territories.is_empty()
+    }
 }
+
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct Turn {
@@ -77,6 +81,13 @@ impl Game {
         game
     }
 
+    pub fn is_over(&self) -> bool {
+        let active_players: Vec<usize> = self.active_players();
+        active_players.len() <= 1
+    }
+    pub fn active_players(&self) -> Vec<usize> {
+        self.players.iter().filter(|p| !p.is_elimiated()).map(|p| p.index as usize).collect()
+    }
     pub fn hit_troop_placement_limit(&self) -> bool {
         self.troops_staged_for_placement() >= self.troops_available_for_placement()
     }
