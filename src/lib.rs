@@ -1,10 +1,15 @@
+extern crate web_sys;
+
 mod utils;
 
-use rand::prelude::*;
+macro_rules! log {
+    ( $( $t:tt )* ) => {
+        web_sys::console::log_1(&format!( $( $t )* ).into());
+    }
+}
+
 use std::collections::HashMap;
-use std::ops::Range;
 use wasm_bindgen::prelude::*;
-use wasm_bindgen::__rt::std::thread::current;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -27,7 +32,11 @@ pub struct Player {
     color: u32,
     territories: Vec<u32>,
 }
-
+impl Player {
+    pub fn capture_territory(&mut self, territory_index: u32) -> () {
+        self.territories.push(territory_index);
+    }
+}
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct Turn {
@@ -47,6 +56,7 @@ pub struct Game {
 #[wasm_bindgen]
 impl Game {
     pub fn new() -> Game {
+        utils::set_panic_hook();
         let map = Map::new();
 
         let players = vec!(
@@ -224,6 +234,35 @@ impl Game {
             0 as usize
         }
     }
+
+    pub fn attack_tail(&mut self) -> () {
+        let selected_idx = self.selected_territory_index();
+        let targeted_idx = self.targeted_territory_index();
+        match (selected_idx, targeted_idx) {
+            (Some(attacker), Some(defender)) => {
+                let attack_dice = self.map.territories[attacker].troops - 1;
+                let defend_dice = self.map.territories[defender].troops;
+                let survivors = self.roll_all(attack_dice, defend_dice);
+                if survivors.1 == 0 { // Attacker won;
+                    self.map.territories[attacker].troops = 1;
+                    self.map.territories[defender].troops = survivors.0;
+                    let player_idx = self.on_player_index().clone();
+                    self.players.iter_mut().find(|p| p.territories.contains(&(defender as u32)))
+                        .map(|p| p.territories.retain(|i| i != &(defender as u32)));
+                    self.players[player_idx].capture_territory(defender as u32);
+                    self.update_colors();
+                } else {
+                    self.map.territories[attacker].troops = survivors.0 + 1;
+                    self.map.territories[defender].troops = survivors.1;
+                }
+            },
+            _ => ()
+        };
+        self.unselect_all();
+    }
+    pub fn attack_all(&mut self) -> () {
+
+    }
 }
 
 impl Game {
@@ -231,11 +270,19 @@ impl Game {
         &(self.players[self.on_player_index()])
     }
     pub fn add_troops(&mut self, target: &usize, troops: &usize) -> () {
-        if self.on_player().territories.contains(&(*target as u32)) {
+        // if self.on_player().territories.contains(&(*target as u32)) {
             let current_troops = &self.map.territories[*target].troops;
             let new_troops = *current_troops + (*troops as u32);
             self.map.territories[*target].troops = new_troops;
-        }
+        // }
+    }
+    pub fn sub_troops(&mut self, target: &usize, troops: &usize) -> () {
+        let current_troops = &self.map.territories[*target].troops;
+        let new_troops = *current_troops - (*troops as u32); // TODO: Handle negatives
+        self.map.territories[*target].troops = new_troops;
+    }
+    pub fn set_troops(&mut self, target: &usize, troops: &usize) -> () {
+       self.map.territories[*target].troops = *troops as u32;
     }
     pub fn unselect_all(&mut self) -> () {
         self.map.territories.iter_mut().for_each(|t| t.state = TerritoryState::Dormant);
@@ -243,6 +290,42 @@ impl Game {
     pub fn calc_troop_bonus(&self) -> usize {
         5 as usize
     }
+    pub fn selected_territory_with_index(&self) -> Option<(usize, &Territory)> {
+        self.map.territories.iter().enumerate().find(|t| (*t).1.is_selected())
+    }
+    pub fn targeted_territory_with_index(&self) -> Option<(usize, &Territory)> {
+        self.map.territories.iter().enumerate().find(|t| (*t).1.is_targeted())
+    }
+    pub fn selected_territory_index(&self) -> Option<usize> {
+        self.selected_territory_with_index().map(|t| t.0)
+    }
+    pub fn targeted_territory_index(&self) -> Option<usize> {
+        self.targeted_territory_with_index().map(|t| t.0)
+    }
+
+    // Returns how many troops left: (attack, defense)
+    fn roll_all(&self, mut attack_dice: u32, mut defend_dice: u32) -> (u32, u32) {
+        while attack_dice > 0 && defend_dice > 0 {
+            let losses = if attack_dice >= 3 && defend_dice >= 2 {
+                roll_dice(3, 2)
+            } else if attack_dice >= 3 {
+                roll_dice(3, defend_dice)
+            } else {
+                roll_dice(attack_dice, defend_dice)
+            };
+            attack_dice -= losses.0;
+            defend_dice -= losses.1;
+        }
+        (attack_dice, defend_dice)
+    }
+
+}
+
+fn roll_dice(attack_dice: u32, defense_dice: u32) -> (u32, u32) {
+    // TODO: Find a wasm compatible rng...
+    // Returns (attack losses, defences losses), let attack always win for now
+    if attack_dice == 1 && defense_dice == 1 { (1,0) }
+    else { (1,1) }
 }
 
 #[wasm_bindgen]
@@ -283,15 +366,19 @@ impl Map {
     }
 
     pub fn set_color_for(&mut self, index: usize, color: usize) -> () {
+        log!("[----] Setting color {} for index {}", color, index);
         self.territories[index].color = color as u32;
+        log!("[----] Post set check, color = {}", self.territories[index].color);
     }
     // todo: convert to owner color, default neutral
     pub fn color_for(&self, index: usize) -> u32 {
-        self.territories[index].color.clone()
+        let color = self.territories[index].color.clone();
+        log!("Getting color {} for territory {}", color, index);
+        color
     }
 
     pub fn territory_with_color(&self, color: usize) -> usize {
-        *self.territories.iter().enumerate().find(|(i, t)|
+        *self.territories.iter().enumerate().find(|(i, _)|
             color - self.background_color - 1 == *i
         ).map(|x| x.0).get_or_insert(self.background_index)
     }
@@ -334,9 +421,6 @@ impl Map {
         }
     }
 
-    pub fn select_as_place_target(&mut self, index: usize) -> bool { true }
-    pub fn select_as_attack_target(&mut self, index: usize) -> bool { true }
-    pub fn select_as_fortify_target(&mut self, index: usize) -> bool { true }
     pub fn unselect(&mut self, index: usize) -> () {
         self.territories[index].state = TerritoryState::Dormant
     }
@@ -361,12 +445,13 @@ impl Map {
 }
 
 impl Map {
-    fn get_index(&self, row: u32, col: u32) -> usize {
-        (row * self.width + col) as usize
-    }
-    fn find_selected(&self) -> Option<&Territory> {
-        self.territories.iter().find(|&t| t.state == TerritoryState::Selected)
-    }
+    // fn get_index(&self, row: u32, col: u32) -> usize {
+    //     (row * self.width + col) as usize
+    // }
+    // fn find_selected(&self) -> Option<&Territory> {
+    //     self.territories.iter().find(|&t| t.state == TerritoryState::Selected)
+    // }
+
     // Index of territory + 1, to account for outside = 0
     pub fn match_color_with_index(index: &usize, territory_blue: isize, click_blue: isize) -> bool {
         let sign = (128 - territory_blue).signum();
@@ -382,6 +467,7 @@ impl Map {
     pub fn set_all_territory_colors(&mut self, players: &Vec<Player>) -> () {
         for player in players {
             for territory in &player.territories {
+                log!("Setting territory {} to color {}", territory, player.color);
                 self.set_color_for(*territory as usize, player.color as usize);
             }
         }
@@ -421,6 +507,7 @@ impl Territory {
         self.state == TerritoryState::Highlighted ||
             self.is_selected() || self.is_targeted()
     }
+    pub fn set_troops(&mut self, troops: u32) -> () { self.troops = troops}
     pub fn add_troops(&mut self, troops: u32) -> () { self.troops = self.troops + troops }
     pub fn sub_troops(&mut self, troops: u32) -> () {
         let new_troops = self.troops - troops ;

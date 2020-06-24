@@ -166,8 +166,9 @@ const drawMapBackground = () => {
 
 const drawMap = () => {
     for (let i = 0; i < territoryCount; i++) {
+
         let vertices = map.vertices_for(i);
-        let rustColor = map.color_for(i);
+        let rustColor = game.get_map().color_for(i);
         let color = u32ToColor(rustColor);
 
         mapContext.beginPath();
@@ -192,7 +193,7 @@ const drawTroopContainers = () => {
     for (let i = 0; i < territoryCount; i++) {
         let node = nodes[i];
         if (game.get_map().is_highlighted(i)) {
-            let color = u32ToColor(map.color_for(i));
+            let color = u32ToColor(game.get_map().color_for(i));
             mapContext.strokeStyle = color; //GRID_COLOR;
             mapContext.fillStyle = color;
             let x = getX(node) * MAP_SCALE;
@@ -250,8 +251,19 @@ const drawArrow = (fromx, fromy, tox, toy) => {
     mapContext.stroke();
 }
 
-const attackTroopSelector = document.getElementById("troop-attack-selector")
-const attackPrompt = () => {
+// -- ATTACKING -- //
+const attackModal = document.getElementById("attack-modal");
+const attackTroopSelector = document.getElementById("troop-attack-selector");
+const attackAndTailButton = document.getElementById('attack-modal-button-tail');
+attackAndTailButton.addEventListener('click', e => {
+    game.attack_tail();
+    renderLoop();
+})
+const attackAllButton = document.getElementById('attack-modal-button-all');
+
+
+
+const showAttackPrompt = () => {
     // Initialize options
     let len = attackTroopSelector.options.length;
     for (let i = len - 1; i >= 0; i-- ) {
@@ -263,8 +275,14 @@ const attackPrompt = () => {
         if (i === 0) continue;
         attackTroopSelector.options[attackTroopSelector.options.length] = new Option(i.toString(),i.toString());
     }
-    attackTroopSelector.style.zIndex = 9999;
+    attackModal.style.zIndex = 9999;
 }
+const hideAttackPrompt = () => {
+    attackModal.style.zIndex = -1;
+}
+
+
+
 
 const updateTroops = () => {
     let troops = game.get_map().troops();
@@ -294,7 +312,9 @@ const updateControls = () => {
         applyPlacementButton.hidden = false;
     }
     if (game.is_attack_phase() && game.attack_target_selected()) {
-        attackPrompt();
+        showAttackPrompt();
+    } else {
+        hideAttackPrompt();
     }
 }
 const renderLoop = () => {
