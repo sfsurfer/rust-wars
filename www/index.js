@@ -232,7 +232,6 @@ const drawMovementArrow = () => {
 }
 
 const drawArrow = (fromx, fromy, tox, toy) => {
-    console.log("drawing arrow");
     let RADIUS_MULTIPLIER = 1.25
     let headlen = 10;
     let xDiff = tox - fromx;
@@ -261,22 +260,35 @@ const drawArrow = (fromx, fromy, tox, toy) => {
 // -- ATTACKING -- //
 const attackModal = document.getElementById("attack-modal");
 const attackTroopSelector = document.getElementById("troop-attack-selector");
+attackTroopSelector.onchange = () => {
+    game.attack_with(attackTroopSelector.selectedIndex + 1);
+    attackModal.style.zIndex = -1;
+    renderLoop();
+}
 const attackAndTailButton = document.getElementById('attack-modal-button-tail');
 attackAndTailButton.addEventListener('click', e => {
     game.attack_tail();
     renderLoop();
-})
+});
 const attackAllButton = document.getElementById('attack-modal-button-all');
+attackAllButton.addEventListener('click', e => {
+    game.attack_all();
+    renderLoop();
+});
 
-
-
+const attackCancelButton = document.getElementById('attack-modal-button-cancel')
+attackCancelButton.addEventListener('click', e => {
+    attackModal.style.zIndex = -1;
+    game.unselect_all();
+    renderLoop();
+})
 const showAttackPrompt = () => {
     // Initialize options
     let len = attackTroopSelector.options.length;
     for (let i = len - 1; i >= 0; i-- ) {
         attackTroopSelector.remove(i);
     }
-    let troops = game.troops_available_for_attack();
+    let troops = game.troops_available_for_movement();
     // attackTroopSelector.options.length = troops;
     for (const i of Array(troops).keys()) {
         if (i === 0) continue;
@@ -289,7 +301,37 @@ const hideAttackPrompt = () => {
 }
 
 
+// --- FORTIFY ---
+const fortifyModal = document.getElementById("fortify-modal");
+const fortifyTroopSelector = document.getElementById("troop-fortify-selector");
+fortifyTroopSelector.onchange = () => {
+    game.fortify_troops(fortifyTroopSelector.selectedIndex + 1);
+    fortifyModal.style.zIndex = -1;
+    renderLoop();
+}
+const fortifyAllButton = document.getElementById('fortify-modal-button-all');
+fortifyAllButton.addEventListener('click', e => {
+    game.fortify_all();
+    fortifyModal.style.zIndex = -1;
+    renderLoop();
+})
+const showFortifyPrompt = (troops = game.troops_available_for_movement()) => {
+    console.log("show fortify prompt with " + troops + " troops");
+    // Initialize options
+    let len = fortifyTroopSelector.options.length;
+    for (let i = len - 1; i >= 0; i-- ) {
+        fortifyTroopSelector.remove(i);
+    }
 
+    for (const i of Array(troops).keys()) {
+        if (i === 0) continue;
+        fortifyTroopSelector.options[fortifyTroopSelector.options.length] = new Option(i.toString(),i.toString());
+    }
+    fortifyModal.style.zIndex = 9999;
+}
+const hideFortifyPrompt = () => {
+    fortifyModal.style.zIndex = -1;
+}
 
 const updateTroops = () => {
     let troops = game.get_map().troops();
@@ -318,10 +360,15 @@ const updateControls = () => {
         clearPlacementButton.hidden = false;
         applyPlacementButton.hidden = false;
     }
-    if (game.is_attack_phase() && game.attack_target_selected()) {
+    if (game.is_attack_phase() && game.target_selected()) {
         showAttackPrompt();
     } else {
         hideAttackPrompt();
+    }
+    if (game.is_fortify_phase() && game.target_selected()) {
+        showFortifyPrompt();
+    } else {
+        hideFortifyPrompt();
     }
 }
 const renderLoop = () => {
