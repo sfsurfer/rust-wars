@@ -373,12 +373,12 @@ const updateControls = () => {
 }
 const renderLoop = () => {
     // mapContext.globalCompositeOperation = 'destination-over';
-    gameStatus();
     drawMap();
     drawTroopContainers();
     drawMovementArrow();
     updateTroops();
     updateControls();
+    gameStatus(); // todo: restart/disable game after someone wins
 };
 
 drawMapBackground();
