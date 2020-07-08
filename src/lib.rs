@@ -56,8 +56,10 @@ pub struct Game {
 impl Game {
     pub fn new() -> Game {
         utils::set_panic_hook();
-        let rng: StdRng = rand::SeedableRng::seed_from_u64(1234);
-        let map = Map::new();
+
+        let seed: u64 = 1234;
+        let rng: StdRng = rand::SeedableRng::seed_from_u64(seed);
+        let map: Map = Map::new();
 
         let players = vec!(
             Player{ index: 0, color: 0xAA1111, territories: vec!() },
@@ -85,16 +87,15 @@ impl Game {
     pub fn active_players(&self) -> Vec<usize> {
         self.players.iter().filter(|p| !p.is_eliminated()).map(|p| p.index as usize).collect()
     }
-    pub fn hit_troop_placement_limit(&self) -> bool {
-        self.troops_staged_for_placement() >= self.troops_available_for_placement()
-    }
+
+    pub fn hit_troop_placement_limit(&self) -> bool { self.troops_available_for_placement() <= 0 }
+
     pub fn map_click_action(&mut self, territory: usize) -> bool {
-        // TODO: Add all top level clicking logic here
         match self.turn.phase {
             TurnPhase::Place => {
-                if self.on_player().territories.contains(&(territory as u32)) && !self.hit_troop_placement_limit(){
+                if self.on_player().territories.contains(&(territory as u32)) && !self.hit_troop_placement_limit() {
                     self.map.territories[territory].state = TerritoryState::Selected;
-                    self.map.cache_troop_placement(territory, 1); // todo -> pass in have value cached
+                    self.map.cache_troop_placement(territory); // todo -> pass in have value cached
                     true
                 } else { false }
             },
@@ -145,10 +146,20 @@ impl Game {
             TurnPhase::PostAttackFortify => false,
         }
     }
+    pub fn get_troops_to_place(&self) -> usize { self.map.troops_to_place }
+    pub fn set_troops_to_place(&mut self, t: usize) -> () { self.map.troops_to_place = t; }
     pub fn clear_placement_cache(&mut self) -> () {
         self.map.troop_placement_cache.clear();
         self.map.territories.iter_mut().for_each(|t| t.state = TerritoryState::Dormant);
     }
+
+    pub fn new_troops(&self) -> u32 { self.turn.new_troops }
+    pub fn troops_available_for_placement(&self) -> u32 {
+        let uncommitted: u32 = self.turn.new_troops;
+        let cached: usize = self.map.troop_placement_cache.values().sum();
+        uncommitted - (cached as u32)
+    }
+
     pub fn commit_placement_cache(&mut self) -> () {
         let troops_placed: usize = self.map.troop_placement_cache.values().sum();
         let updated_troops_available = self.turn.new_troops - troops_placed as u32;
@@ -158,31 +169,18 @@ impl Game {
         self.turn.new_troops = updated_troops_available;
     }
 
-    pub fn place_phase(&mut self) -> () {
-        // TODO: Needs checks that this is allowed
-        //       for now just move to place whenever button is pressed
-        self.turn.phase = TurnPhase::Place;
-    }
-    pub fn attack_phase(&mut self) -> () {
-        // TODO: Needs checks that this is allowed
-        //       for now just move to attack whenever button is pressed
-        self.turn.phase = TurnPhase::Attack;
-    }
-    pub fn fortify_phase(&mut self) -> () {
-        // TODO: Needs checks that this is allowed
-        //       for now just move to fortify whenever button is pressed
-        self.turn.phase = TurnPhase::Fortify;
-    }
-    pub fn is_place_phase(&self) -> bool {
-        self.turn.phase == TurnPhase::Place
-    }
-    pub fn is_attack_phase(&self) -> bool {
-        self.turn.phase == TurnPhase::Attack
-    }
+    // TODO: These need checks that each is allowed
+    //       for now just move to segment whenever button is pressed
+    pub fn place_phase(&mut self) -> () { self.turn.phase = TurnPhase::Place; }
+    pub fn attack_phase(&mut self) -> () { self.turn.phase = TurnPhase::Attack; }
+    pub fn fortify_phase(&mut self) -> () { self.turn.phase = TurnPhase::Fortify; }
+
+    pub fn is_place_phase(&self) -> bool { self.turn.phase == TurnPhase::Place }
+    pub fn is_attack_phase(&self) -> bool { self.turn.phase == TurnPhase::Attack }
     pub fn is_fortify_phase(&self) -> bool {
         vec!(TurnPhase::Fortify, TurnPhase::PostAttackFortify).contains(&self.turn.phase)
-        // self.turn.phase == TurnPhase::Fortify
     }
+
     pub fn target_selected(&self) -> bool {
         self.map.territories.iter().find(|t| t.is_targeted()).is_some()
     }
@@ -227,9 +225,9 @@ impl Game {
         self.turn.new_troops = troops;
         self.turn.phase = TurnPhase::Place;
     }
-    pub fn troops_available_for_placement(&self) -> usize {
-        self.turn.new_troops.clone() as usize
-    }
+    // pub fn troops_available_for_placement(&self) -> usize {
+    //     self.turn.new_troops.clone() as usize
+    // }
     pub fn troops_staged_for_placement(&self) -> usize {
         self.map.troop_placement_cache.values().sum()
     }
@@ -414,8 +412,8 @@ impl Game {
         let mut defenses: Vec<u8> = vec![0; defense_dice as usize].iter_mut().map(|_| self.rng.gen_range(1,7)).collect();
         attacks.sort();
         defenses.sort();
-        log!("Attacks = {:?}", attacks);
-        log!("Defenses = {:?}", defenses);
+        // log!("Attacks = {:?}", attacks);
+        // log!("Defenses = {:?}", defenses);
         if attack_dice == 1 && defense_dice == 1 { AttackResults{ attack_dice: 1, defend_dice: 0 } }
         else { AttackResults { attack_dice: 1, defend_dice: 1 } }
     }

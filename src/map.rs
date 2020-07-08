@@ -8,6 +8,12 @@ pub use crate::player::Player;
 pub use crate::map::territory::*;
 pub use crate::map::country::*;
 
+macro_rules! log {
+    ( $( $t:tt )* ) => {
+        web_sys::console::log_1(&format!( $( $t )* ).into());
+    }
+}
+
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct Map {
@@ -16,6 +22,7 @@ pub struct Map {
     pub(crate) territories: Vec<Territory>,
     pub background_color: usize,
     pub background_index: usize,
+    pub(crate) troops_to_place: usize,
     pub(crate) troop_placement_cache: HashMap<usize, usize>
 }
 
@@ -105,9 +112,9 @@ impl Map {
         self.territories[attacker].neighbors.contains(&x)
     }
 
-    pub fn cache_troop_placement(&mut self, index: usize, troops: usize) -> usize {
+    pub fn cache_troop_placement(&mut self, index: usize) -> usize {
         self.territories[index].state = TerritoryState::Selected;
-        self.troop_placement_cache(&index, troops)
+        self.troop_placement_cache(&index)
     }
 
     pub fn commit_troop_placement(&mut self) -> () {
@@ -121,20 +128,15 @@ impl Map {
 }
 
 impl Map {
-    // fn get_index(&self, row: u32, col: u32) -> usize {
-    //     (row * self.width + col) as usize
-    // }
-    // fn find_selected(&self) -> Option<&Territory> {
-    //     self.territories.iter().find(|&t| t.state == TerritoryState::Selected)
-    // }
-
     // Index of map.territory + 1, to account for outside = 0
     pub fn match_color_with_index(index: &usize, territory_blue: isize, click_blue: isize) -> bool {
         let sign = (128 - territory_blue).signum();
         let i = *index as isize;
         territory_blue + (sign * i as isize) == click_blue
     }
-    pub fn troop_placement_cache(&mut self, index: &usize, troops: usize) -> usize {
+    pub fn troop_placement_cache(&mut self, index: &usize) -> usize {
+        let troops: usize = self.troops_to_place;
+        log!("[rust] placing {} troops", troops);
         let new_troops: usize = self.troop_placement_cache.get(index).map(|x| x + troops).get_or_insert(troops).clone();
         self.troop_placement_cache.insert(*index, new_troops);
         self.territories[*index].state = TerritoryState::Selected;
@@ -214,7 +216,8 @@ impl Map {
             territories: vec![t1,t2,t3,t4,t5],
             background_color: 0,
             background_index: 16777215,
-            troop_placement_cache: HashMap::new()
+            troops_to_place: 1,
+            troop_placement_cache: HashMap::new(),
         }
     }
 }

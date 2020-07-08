@@ -52,13 +52,33 @@ troopCanvas.addEventListener('mousedown', function (e) {
 const bgContext = bgCanvas.getContext('2d');
 bgContext.fillStyle = u32ToColor(map.background_color());
 bgContext.fillRect(0,0,mapCanvas.width, mapCanvas.height);
-// bgContext.stroke();
 
 const mapContext = mapCanvas.getContext('2d');
 
 const troopContext = troopCanvas.getContext('2d');
 
 troopContext.globalCompositeOperation = 'destination-over';
+
+const initializeSelector = (selector) => {
+    if (selector.nodeName && selector.nodeName.toLowerCase() === "select") {
+        let len = selector.options.length;
+        for (let i = len - 1; i >= 0; i--) {
+            selector.remove(i);
+        }
+    } else {
+        console.error("Attempted to call initializeSelector on type " + selector.nodeName);
+    }
+};
+
+// --- TROOP PLACEMENT ---
+const hidePlacementElements = (hide) => {
+    if (typeof hide === "boolean") {
+        clearPlacementButton.hidden = hide;
+        applyPlacementButton.hidden = hide;
+        placeTroopSelector.hidden = hide;
+        troopCounterDisplay.hidden = hide;
+    }
+};
 
 let clearPlacementButton = document.getElementById("clear-placement")
 clearPlacementButton.addEventListener('click', event => {
@@ -71,8 +91,7 @@ applyPlacementButton.addEventListener('click', e => {
     game.commit_placement_cache();
     if (game.troops_available_for_placement() === 0) {
         game.attack_phase();
-        clearPlacementButton.hidden = true;
-        applyPlacementButton.hidden = true;
+        hidePlacementElements(true);
         placeButton.disabled = true;
     }
     renderLoop();
@@ -81,22 +100,44 @@ applyPlacementButton.addEventListener('click', e => {
 let placeButton = document.getElementById('placement-button')
 placeButton.addEventListener('click', e => {
     game.place_phase();
-    clearPlacementButton.hidden = false;
-    applyPlacementButton.hidden = false;
-})
+    initializePlacementSelector();
+    hidePlacementElements(false);
+});
+
+// Troops to place selector
+const placeTroopSelector = document.getElementById("troops-to-place-selector");
+const initializePlacementSelector = () => {
+    initializeSelector(placeTroopSelector);
+    let troops = game.troops_available_for_placement(); // - game.troops_staged_for_placement();
+    for (const i of Array(troops).keys()) {
+        placeTroopSelector.options[placeTroopSelector.options.length] = new Option((i+1).toString(), (i+1).toString());
+    }
+    placeTroopSelector.selectedIndex = 0;
+};
+
+const updatePlacementSelector = () => {
+    placeTroopSelector.selectedIndex = game.get_troops_to_place() - 1;
+};
+
+placeTroopSelector.onchange = () => {
+    let availableTroops = game.troops_available_for_placement(); //  - game.troops_staged_for_placement();
+    if (placeTroopSelector.options.length >= availableTroops) {
+        game.set_troops_to_place(1);
+    } else {
+        game.set_troops_to_place(placeTroopSelector.value);
+    }
+};
 
 let attackButton = document.getElementById("attack-button")
 attackButton.addEventListener('click', e => {
     game.attack_phase();
-    clearPlacementButton.hidden = true;
-    applyPlacementButton.hidden = true;
+    hidePlacementElements(true);
 })
 
 let fortifyButton = document.getElementById("fortify-button")
 fortifyButton.addEventListener('click', e => {
     game.fortify_phase();
-    clearPlacementButton.hidden = true;
-    applyPlacementButton.hidden = true;
+    hidePlacementElements(true);
 })
 
 let endTurnButton = document.getElementById('end-turn-button')
@@ -108,7 +149,7 @@ const troopCounterDisplay = document.getElementById('troop-placement-counter')
 const updateTroopPlacementCounter = () => {
     if (game.is_place_phase()) {
         troopCounterDisplay.hidden = false;
-        let denominator = game.troops_available_for_placement();
+        let denominator = game.new_troops(); // TODO
         let numerator = game.troops_staged_for_placement();
         troopCounterDisplay.innerText = numerator.toString() + "/" + denominator.toString();
     } else {
@@ -300,7 +341,6 @@ const hideAttackPrompt = () => {
     attackModal.style.zIndex = -1;
 }
 
-
 // --- FORTIFY ---
 const fortifyModal = document.getElementById("fortify-modal");
 const fortifyTroopSelector = document.getElementById("troop-fortify-selector");
@@ -316,13 +356,8 @@ fortifyAllButton.addEventListener('click', e => {
     renderLoop();
 })
 const showFortifyPrompt = (troops = game.troops_available_for_movement()) => {
-    console.log("show fortify prompt with " + troops + " troops");
     // Initialize options
-    let len = fortifyTroopSelector.options.length;
-    for (let i = len - 1; i >= 0; i-- ) {
-        fortifyTroopSelector.remove(i);
-    }
-
+    initializeSelector(fortifyTroopSelector);
     for (const i of Array(troops).keys()) {
         if (i === 0) continue;
         fortifyTroopSelector.options[fortifyTroopSelector.options.length] = new Option(i.toString(),i.toString());
@@ -354,11 +389,10 @@ const updateTroops = () => {
     }
 };
 const updateControls = () => {
+    initializePlacementSelector();
     updateTroopPlacementCounter();
     if (game.is_place_phase()) {
-        placeButton.disabled = false;
-        clearPlacementButton.hidden = false;
-        applyPlacementButton.hidden = false;
+        hidePlacementElements(false);
     }
     if (game.is_attack_phase() && game.target_selected()) {
         showAttackPrompt();
