@@ -405,17 +405,23 @@ impl Game {
         AttackResults { attack_dice, defend_dice }
     }
 
-    // Returns losses (thiw is counter to roll_all, which returns survivors, todo: rework to be consistent
+    // Retu rns losses (thiw is counter to roll_all, which returns survivors, todo: rework to be consistent
     fn roll_dice(&mut self, attack_dice: u32, defense_dice: u32) -> AttackResults {
-        // Returns (attack losses, defences losses)
         let mut attacks: Vec<u8> = vec![0; attack_dice as usize].iter_mut().map(|_| self.rng.gen_range(1,7)).collect();
         let mut defenses: Vec<u8> = vec![0; defense_dice as usize].iter_mut().map(|_| self.rng.gen_range(1,7)).collect();
         attacks.sort();
         defenses.sort();
-        // log!("Attacks = {:?}", attacks);
-        // log!("Defenses = {:?}", defenses);
-        if attack_dice == 1 && defense_dice == 1 { AttackResults{ attack_dice: 1, defend_dice: 0 } }
-        else { AttackResults { attack_dice: 1, defend_dice: 1 } }
+        let mut results = AttackResults { attack_dice: 0, defend_dice: 0 };
+        while (!attacks.is_empty() && !defenses.is_empty()) {
+            match (attacks.pop(), defenses.pop()) {
+                (Some(attack), Some(defend)) if attack > defend => results.defend_dice += 1,
+                (Some(_), Some(_)) => results.attack_dice += 1,
+                _ => ()
+            }
+        }
+        results
+        // if attack_dice == 1 && defense_dice == 1 { AttackResults{ attack_dice: 1, defend_dice: 0 } }
+        // else { AttackResults { attack_dice: 1, defend_dice: 1 } }
     }
 
 }
