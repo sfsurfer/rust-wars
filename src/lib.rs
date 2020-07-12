@@ -225,9 +225,6 @@ impl Game {
         self.turn.new_troops = troops;
         self.turn.phase = TurnPhase::Place;
     }
-    // pub fn troops_available_for_placement(&self) -> usize {
-    //     self.turn.new_troops.clone() as usize
-    // }
     pub fn troops_staged_for_placement(&self) -> usize {
         self.map.troop_placement_cache.values().sum()
     }
@@ -236,83 +233,37 @@ impl Game {
         *(total_troops.map(|t| t as usize).get_or_insert(0))
     }
 
-    // Todo: Figure out how to pass functions around
-    // Todo: should stop at 3 left to attack
     pub fn attack_tail(&mut self) -> () {
-        let selected_idx = self.selected_territory_index();
-        let targeted_idx = self.targeted_territory_index();
-        match (selected_idx, targeted_idx) {
-            (Some(attacker), Some(defender)) => {
-                let attack_dice = self.map.territories[attacker].troops - 1;
-                let defend_dice = self.map.territories[defender].troops;
-                let survivors = self.roll_all(attack_dice, defend_dice);
-                if survivors.defend_dice == 0 { // Attacker won;
-                    self.map.territories[attacker].troops = 1;
-                    self.map.territories[defender].troops = survivors.attack_dice;
-                    let player_idx = self.on_player_index().clone();
-                    self.players.iter_mut().find(|p| p.territories.contains(&(defender as u32)))
-                        .map(|p| p.territories.retain(|i| i != &(defender as u32)));
-                    self.players[player_idx].capture_territory(defender as u32);
-                    self.update_colors();
-                } else {
-                    self.map.territories[attacker].troops = survivors.attack_dice + 1;
-                    self.map.territories[defender].troops = survivors.defend_dice;
-                }
-            },
-            _ => ()
-        };
-        self.unselect_all();
+        self.attack_all();
+        if self.turn_phase() == TurnPhase::PostAttackFortify {
+            self.fortify_all();
+            self.turn.phase = TurnPhase::Attack;
+        }
     }
-    // Returns troops available for transfer, or 0 if attacker lost
-    pub fn attack_all(&mut self) -> () {
-        // TODO: Refactor to something like... There's a small diff, though
-        // match self.selected_territory_index() {
-        //     Some(attacker) => {
-        //         let attack_troops = self.map.territories[attacker].troops - 1;
-        //         self.attack_with(attack_troops as usize);
-        //     }
-        //     _ => ()
-        // }
-        let selected_idx = self.selected_territory_index();
-        let targeted_idx = self.targeted_territory_index();
-        match (selected_idx, targeted_idx) {
-            (Some(attacker), Some(defender)) => {
-                let attack_dice = self.map.territories[attacker].troops - 1;
-                let defend_dice = self.map.territories[defender].troops;
-                let survivors = self.roll_all(attack_dice, defend_dice);
-                if survivors.defend_dice == 0 { // Attacker won;
-                    let remaining_troops = if survivors.attack_dice > 3 { survivors.attack_dice - 2 } else { 1 };
-                    self.map.territories[attacker].troops = remaining_troops;
-                    self.map.territories[defender].troops = std::cmp::min(survivors.attack_dice, 3);
-                    let player_idx = self.on_player_index().clone();
-                    self.players.iter_mut().find(|p| p.territories.contains(&(defender as u32)))
-                        .map(|p| p.territories.retain(|i| i != &(defender as u32)));
-                    self.players[player_idx].capture_territory(defender as u32);
-                    self.update_colors();
-                    log!("remaining_troops - 1 = {}", (remaining_troops - 1));
-                    if remaining_troops <= 1 { self.unselect_all(); } else { self.turn.phase = TurnPhase::PostAttackFortify }
 
-                } else {
-                    self.map.territories[attacker].troops = survivors.attack_dice + 1;
-                    self.map.territories[defender].troops = survivors.defend_dice;
-                }
-            },
+    // Todo: should stop at 3 left to attack
+    pub fn attack_all(&mut self) -> () {
+        match self.selected_territory_index() {
+            Some(attacker) => {
+                let attack_troops = self.map.territories[attacker].troops - 1;
+                self.attack_with(attack_troops);
+            }
             _ => ()
         }
     }
-    pub fn attack_with(&mut self, troops: usize) -> () {
-        let selected_idx = self.selected_territory_index();
-        let targeted_idx = self.targeted_territory_index();
-        match (selected_idx, targeted_idx) {
+
+    pub fn attack_with(&mut self, troops: u32) -> () {
+        match (self.selected_territory_index(), self.targeted_territory_index()) {
             (Some(attacker), Some(defender)) => {
-                let attack_dice = troops as u32;
-                let reserves = self.map.territories[attacker].troops - attack_dice;
-                let defend_dice = self.map.territories[defender].troops;
-                let survivors = self.roll_all(attack_dice, defend_dice);
-                if survivors.defend_dice == 0 { // Attacker won;
-                    let remaining_troops = if survivors.attack_dice > 3 { survivors.defend_dice - 2 } else { 1 } + reserves;
+                let attack_reserves = self.map.territories[attacker].troops - troops;
+                let defend_with = self.map.territories[defender].troops;
+                let losses = self.roll_all(troops, defend_with);
+                let remaining_attackers = troops - losses.attack_dice;
+                let remaining_defenders = defend_with - losses.defend_dice;
+                if remaining_defenders == 0 { // Territory captured
+                    let remaining_troops = if remaining_attackers > 3 { remaining_attackers - 3 } else { 1 } + attack_reserves;
                     self.map.territories[attacker].troops = remaining_troops;
-                    self.map.territories[defender].troops = std::cmp::min(survivors.attack_dice, 3);
+                    self.map.territories[defender].troops = std::cmp::min(remaining_attackers, 3);
                     let player_idx = self.on_player_index().clone();
                     self.players.iter_mut().find(|p| p.territories.contains(&(defender as u32)))
                         .map(|p| p.territories.retain(|i| i != &(defender as u32)));
@@ -320,13 +271,14 @@ impl Game {
                     self.update_colors();
                     if remaining_troops <= 1 { self.unselect_all(); } else { self.turn.phase = TurnPhase::PostAttackFortify }
                 } else {
-                    self.map.territories[attacker].troops = reserves + survivors.attack_dice;
-                    self.map.territories[defender].troops = survivors.defend_dice;
+                    self.map.territories[attacker].troops = attack_reserves + remaining_attackers;
+                    self.map.territories[defender].troops = remaining_defenders;
                 }
             },
             _ => ()
         }
     }
+
     pub fn fortify_all(&mut self) -> () {
         let selected_idx = self.selected_territory_index();
         let targeted_idx = self.targeted_territory_index();
@@ -365,11 +317,9 @@ impl Game {
         &(self.players[self.on_player_index()])
     }
     pub fn add_troops(&mut self, target: &usize, troops: &usize) -> () {
-        // if self.on_player().territories.contains(&(*target as u32)) {
-            let current_troops = &self.map.territories[*target].troops;
-            let new_troops = *current_troops + (*troops as u32);
-            self.map.territories[*target].troops = new_troops;
-        // }
+        let current_troops = &self.map.territories[*target].troops;
+        let new_troops = *current_troops + (*troops as u32);
+        self.map.territories[*target].troops = new_troops;
     }
     pub fn sub_troops(&mut self, target: &usize, troops: &usize) -> () {
         let current_troops = &self.map.territories[*target].troops;
@@ -395,24 +345,27 @@ impl Game {
         self.targeted_territory_with_index().map(|t| t.0)
     }
 
-    // Returns how many troops left: (attack, defense)
-    fn roll_all(&mut self, mut attack_dice: u32, mut defend_dice: u32) -> AttackResults {
-        while attack_dice > 0 && defend_dice > 0 {
-            let losses = self.roll_dice(std::cmp::min(attack_dice, 3), std::cmp::min(defend_dice, 2));
-            attack_dice -= losses.attack_dice;
-            defend_dice -= losses.defend_dice;
+    // Returns how many troops lost: (attack, defense)
+    fn roll_all(&mut self, attack_with: u32, defend_with: u32) -> AttackResults {
+        let mut attack_losses: u32 = 0;
+        let mut defend_losses: u32 = 0;
+        while attack_with > attack_losses && defend_with > defend_losses {
+            let attackers = std::cmp::min(attack_with - attack_losses, 3);
+            let defenders = std::cmp::min(defend_with - defend_losses, 2);
+            let losses = self.roll_dice(attackers, defenders);
+            attack_losses += losses.attack_dice;
+            defend_losses += losses.defend_dice;
         }
-        AttackResults { attack_dice, defend_dice }
+        AttackResults { attack_dice: attack_losses, defend_dice: defend_losses }
     }
 
-    // Retu rns losses (thiw is counter to roll_all, which returns survivors, todo: rework to be consistent
     fn roll_dice(&mut self, attack_dice: u32, defense_dice: u32) -> AttackResults {
         let mut attacks: Vec<u8> = vec![0; attack_dice as usize].iter_mut().map(|_| self.rng.gen_range(1,7)).collect();
         let mut defenses: Vec<u8> = vec![0; defense_dice as usize].iter_mut().map(|_| self.rng.gen_range(1,7)).collect();
         attacks.sort();
         defenses.sort();
         let mut results = AttackResults { attack_dice: 0, defend_dice: 0 };
-        while (!attacks.is_empty() && !defenses.is_empty()) {
+        while !attacks.is_empty() && !defenses.is_empty() {
             match (attacks.pop(), defenses.pop()) {
                 (Some(attack), Some(defend)) if attack > defend => results.defend_dice += 1,
                 (Some(_), Some(_)) => results.attack_dice += 1,
@@ -420,8 +373,6 @@ impl Game {
             }
         }
         results
-        // if attack_dice == 1 && defense_dice == 1 { AttackResults{ attack_dice: 1, defend_dice: 0 } }
-        // else { AttackResults { attack_dice: 1, defend_dice: 1 } }
     }
 
 }
