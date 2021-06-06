@@ -167,6 +167,14 @@ const getY = (idx) => {
     return  Math.floor(idx / width);
 }
 
+const gameStatus = () => {
+    // Simply checks if game is over
+    if (game.is_over()) {
+        let winner = game.active_players()[0];
+        alert(`Game Over. Player ${winner} won!`);
+    }
+}
+
 const drawMapBackground = () => {
     const w = width - 1;
     const h = height - 1;
@@ -186,6 +194,7 @@ const drawMapBackground = () => {
     for (let i = 0; i < territoryCount; i++) {
         let vertices = map.vertices_for(i);
         let rustColor = map.bg_color_for(i);
+        // drawUpdate(vertices, rustColor);
         let color = u32ToColor(rustColor);
 
         bgContext.beginPath();
@@ -204,19 +213,31 @@ const drawMapBackground = () => {
         bgContext.stroke();
     }
 };
-const gameStatus = () => {
-    // Simply checks if game is over
-    if (game.is_over()) {
-        let winner = game.active_players()[0];
-        alert(`Game Over. Player ${winner} won!`);
-    }
-}
+const drawUpdate = (vertices, rustColor) => {
+    let color = u32ToColor(rustColor);
 
+    mapContext.beginPath();
+    mapContext.strokeStyle = GRID_COLOR;
+
+    let start = vertices[0];
+    mapContext.moveTo(getX(start) * MAP_SCALE, getY(start) * MAP_SCALE);
+
+    for (let j = 1; j < vertices.length - 1; j++) {
+        const p2 = vertices[j];
+        mapContext.lineTo(getX(p2) * MAP_SCALE, getY(p2) * MAP_SCALE);
+    }
+    mapContext.closePath();
+    mapContext.fillStyle = color;
+    mapContext.fill();
+    mapContext.stroke();
+
+}
 const drawMap = () => {
     for (let i = 0; i < territoryCount; i++) {
 
         let vertices = map.vertices_for(i);
         let rustColor = game.get_map().color_for(i);
+        // drawUpdate(vertices, rustColor);
         let color = u32ToColor(rustColor);
 
         mapContext.beginPath();

@@ -57,7 +57,7 @@ impl Game {
     pub fn new() -> Game {
         utils::set_panic_hook();
 
-        let seed: u64 = 1234;
+        let seed: u64 = 123;
         let rng: StdRng = rand::SeedableRng::seed_from_u64(seed);
         let map: Map = Map::new();
 
@@ -201,7 +201,7 @@ impl Game {
         let mut unassigned: Vec<usize> = (0..self.map.territories.len()).collect();
         let mut counter: usize = 0;
         while unassigned.len() > 0 {
-            let next_index = 0; //thread_rng().gen_range(0,unassigned.len() - 1);
+            let next_index = self.rng.gen_range(0,unassigned.len());
             let next_territory = unassigned.remove(next_index);
             self.players[counter % player_count].territories.push(next_territory as u32);
             counter = counter + 1;
